@@ -62,7 +62,7 @@ class ModelMessage:
                 require_non_empty(self.content, "content")
             if self.tool_call_id is not None:
                 raise ValueError("ASSISTANT 消息不能包含 tool_call_id")
-        else:
+        elif self.role is MessageRole.TOOL:
             require_non_empty(self.content, "content")
             require_non_empty(self.tool_call_id, "tool_call_id")
             if self.tool_calls:
