@@ -141,12 +141,13 @@ class ToolResultStatus(str, Enum):
 
     # 工具正常返回结果。
     SUCCESS = "success"
-    # 工具解析、校验或执行过程中发生错误。
+    # handler 已经实际执行，但执行过程中发生错误。
     ERROR = "error"
 
 
 @dataclass(frozen=True, slots=True)
 class ToolResult:
+    # 只有真实 handler 执行后才创建 ToolResult；REJECTED/DENIED 不创建。
     """一次工具执行的结构化结果。
 
     垂直业务工具可以自行组织 ``message``，向 Agent 说明执行结果或失败原因；
@@ -163,7 +164,7 @@ class ToolResult:
     output: Any = None
     # 工具自行封装的可读说明；失败时必须提供，成功时可以省略。
     message: str | None = None
-    # 失败时供程序判断错误类别的稳定代码。
+    # handler 执行失败时供程序判断错误类别的稳定代码。
     error_code: str | None = None
 
     def __post_init__(self) -> None:

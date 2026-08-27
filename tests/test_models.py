@@ -218,17 +218,48 @@ class CoreModelTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             ToolCallRecord(call, decision, wrong_result)
 
-    def test_tool_trace_can_record_pre_policy_failure(self) -> None:
-        call = ToolCall("call-1", "missing-tool")
-        result = ToolResult(
+    def test_rejected_tool_call_does_not_create_tool_result(self) -> None:
+        call = ToolCall(
             "call-1",
             "missing-tool",
-            ToolResultStatus.ERROR,
-            message="未找到名称为 missing-tool 的工具",
-            error_code="unknown_tool",
+            status=ToolCallStatus.REJECTED,
         )
-        record = ToolCallRecord(call, None, result)
+        record = ToolCallRecord(call, None, None)
         self.assertIsNone(record.decision)
+        self.assertIsNone(record.result)
+        with self.assertRaisesRegex(ValueError, "不能包含 ToolResult"):
+            ToolCallRecord(
+                call,
+                None,
+                ToolResult(
+                    "call-1",
+                    "missing-tool",
+                    ToolResultStatus.SUCCESS,
+                    output="不应执行",
+                ),
+            )
+
+    def test_denied_tool_call_does_not_create_tool_result(self) -> None:
+        call = ToolCall(
+            "call-1",
+            "write_file",
+            status=ToolCallStatus.DENIED,
+        )
+        decision = PolicyDecision(PolicyOutcome.DENY, "Policy 禁止写入文件")
+        record = ToolCallRecord(call, decision, None)
+        self.assertEqual(record.decision.outcome, PolicyOutcome.DENY)
+        self.assertIsNone(record.result)
+        with self.assertRaisesRegex(ValueError, "不能包含 ToolResult"):
+            ToolCallRecord(
+                call,
+                decision,
+                ToolResult(
+                    "call-1",
+                    "write_file",
+                    ToolResultStatus.SUCCESS,
+                    output="不应执行",
+                ),
+            )
 
     def test_run_result_basic_construction_and_validation(self) -> None:
         now = datetime.now(timezone.utc)

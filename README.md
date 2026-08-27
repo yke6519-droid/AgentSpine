@@ -97,6 +97,8 @@ result = ToolResult(
 - `error_code` 负责让 Agent 或确定性代码稳定识别错误类型。
 - `output` 用于保存工具成功时的领域结果。
 
+`ToolResult(ERROR)` 仅表示真实 handler 执行失败；Unknown Tool、参数校验失败和 Policy 拒绝分别使用 `REJECTED` 或 `DENIED`，不创建 ToolResult。
+
 `ToolCall` 只是模型提出的待授权调用，不代表模型已经获得工具执行权限。
 
 ## 核心模型边界

@@ -14,7 +14,7 @@ from ._validation import (
 from .model import ModelRequest, ModelResponse
 from .policy import PolicyDecision
 from .runtime import RunStatus
-from .tool import ToolCall, ToolResult
+from .tool import ToolCall, ToolCallStatus, ToolResult
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,7 +54,7 @@ class ToolCallRecord:
     call: ToolCall
     # Policy 判断；未知工具或参数非法发生在 Policy 前，因此可以为 None。
     decision: PolicyDecision | None
-    # 工具处理结果；被拒绝或尚未执行时可以为 None。
+    # handler 的工具处理结果；REJECTED、DENIED 或尚未执行时必须为 None。
     result: ToolResult | None
     # 工具真正开始执行的时间，而不是模型提出调用的时间。
     started_at: datetime | None = None
@@ -69,6 +69,8 @@ class ToolCallRecord:
         if self.result is not None:
             if not isinstance(self.result, ToolResult):
                 raise TypeError("result 必须是 ToolResult 或 None")
+            if self.call.status in {ToolCallStatus.REJECTED, ToolCallStatus.DENIED}:
+                raise ValueError("REJECTED 或 DENIED 的 ToolCall 不能包含 ToolResult")
             if self.result.call_id != self.call.call_id:
                 raise ValueError("result.call_id 必须与 call.call_id 一致")
             if self.result.tool_name != self.call.tool_name:
