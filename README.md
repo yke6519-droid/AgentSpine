@@ -2,7 +2,7 @@
 
 AgentSpine 是一个 Python-first 的 Agent Harness / Runtime Framework，目标是为不同垂直领域 Agent 提供可迁移、可控制、可观察的通用运行骨架。
 
-项目当前处于 **V0 第一阶段：基础数据模型与最小项目骨架**。目前提供的是后续 Runtime、Tool、Model、Policy 和 Trace 模块之间的稳定数据契约，还不是一个可以执行完整 Agent Loop 的框架版本。
+当前发布版本为 **V0.0.0 — 基础数据模型与最小项目骨架**，对应 PRD 的 V0 第一阶段。目前提供的是后续 Runtime、Tool、Model、Policy 和 Trace 模块之间的稳定数据契约，还不是一个可以执行完整 Agent Loop 的框架版本。
 
 ## 当前已经具备
 
