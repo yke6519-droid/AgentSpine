@@ -1,6 +1,6 @@
 """Tool 定义、能力描述与调用生命周期模型。"""
 
-from collections.abc import Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -54,8 +54,8 @@ class ToolCapability:
         require_enum(self.replay, Replay, "replay")
 
 
-# 工具处理函数接收已经通过校验的参数映射，并返回任意领域结果。
-ToolHandler = Callable[[Mapping[str, Any]], Any]
+# 工具处理函数可以同步返回结果，也可以返回由执行层 await 的异步结果。
+ToolHandler = Callable[[Mapping[str, Any]], Any | Awaitable[Any]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,6 +99,8 @@ class ToolCallStatus(str, Enum):
     SUCCEEDED = "succeeded"
     # 工具执行过程中发生错误。
     FAILED = "failed"
+    # ToolCall 未通过工具解析或参数契约校验，尚未进入 Policy。
+    REJECTED = "rejected"
     # Policy 明确拒绝了本次执行。
     DENIED = "denied"
 
@@ -120,7 +122,7 @@ class ToolCall:
     status: ToolCallStatus = ToolCallStatus.PROPOSED
     # 工具实际开始执行的时间；尚未执行时为 None。
     started_at: datetime | None = None
-    # 工具成功、失败或被拒绝的时间。
+    # 工具成功、失败、校验被拒或 Policy 拒绝的时间。
     finished_at: datetime | None = None
 
     def __post_init__(self) -> None:

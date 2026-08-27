@@ -2,7 +2,36 @@
 
 AgentSpine 是一个 Python-first 的 Agent Harness / Runtime Framework，目标是为不同垂直领域 Agent 提供可迁移、可控制、可观察的通用运行骨架。
 
+> AgentSpine is a Python-first runtime harness for building reusable vertical agents.
+
 当前发布版本为 **V0.0.0 — 基础数据模型与最小项目骨架**，对应 PRD 的 V0 第一阶段。目前提供的是后续 Runtime、Tool、Model、Policy 和 Trace 模块之间的稳定数据契约，还不是一个可以执行完整 Agent Loop 的框架版本。
+
+## 核心设计原则
+
+### Async-first，兼容同步工具
+
+> AgentSpine is async-first.
+> Tool handlers may be either synchronous or asynchronous.
+> Async handlers are awaited by the execution layer.
+> Sync handlers remain supported for lightweight/local tools.
+
+AgentSpine 采用 async-first 设计。Tool handler 可以是同步函数，也可以是异步函数；后续执行层会 await 异步 handler，同时继续支持适合轻量、本地工作的同步 handler。
+
+当前阶段只定义该类型契约，尚未实现工具执行层。
+
+### LLM 提议，确定性组件约束
+
+> LLM proposes actions.
+> Deterministic components validate state transitions, tool contracts and policy decisions before execution.
+
+LLM 负责提出行动。真正执行前，确定性组件负责校验状态迁移、工具契约和 Policy 决策。模型提出 ToolCall 不代表已经获得工具执行权限。
+
+### Frozen Snapshot，Manager 控制状态迁移
+
+> Runtime and execution state models use immutable-style snapshots.
+> State transitions are intended to be performed by the corresponding managers, rather than through direct mutation by business code.
+
+Runtime 与执行状态模型使用不可原地修改的快照。状态迁移应由对应 Manager 基于旧快照创建新快照，而不是由业务代码直接修改权威状态。
 
 ## 当前已经具备
 
@@ -130,12 +159,6 @@ python -m unittest discover -s tests -v
 - Planner、PlanState 和 PlanStore
 - Pause / Resume、Checkpoint / Recovery
 - Sandbox、ArtifactStore 和 Multi-Agent
-
-## 后续路线
-
-按照当前 PRD，下一阶段建议实现 **V0-2 ModelGateway**，随后依次推进 ToolManager、RuntimeManager、PolicyEngine、ContextManager 和 AgentRunner。
-
-在进入下一阶段前，当前数据模型仍应被视为模块间契约：优先保持边界清晰，以最小扩展满足真实需求，不提前实现 V1 能力。
 
 ## 需求依据
 

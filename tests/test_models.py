@@ -34,6 +34,7 @@ class CoreModelTests(unittest.TestCase):
         self.assertEqual(Replay.IDEMPOTENT.value, "idempotent")
         self.assertEqual(RunStatus.TIMED_OUT.value, "timed_out")
         self.assertEqual(PolicyOutcome.REQUIRE_APPROVAL.value, "require_approval")
+        self.assertEqual(ToolCallStatus.REJECTED.value, "rejected")
 
     def test_tool_capability_accepts_only_its_enums(self) -> None:
         capability = ToolCapability(Effect.EXTERNAL, Replay.UNSAFE)
@@ -42,8 +43,16 @@ class CoreModelTests(unittest.TestCase):
             ToolCapability(effect="external", replay=Replay.UNSAFE)  # type: ignore[arg-type]
 
     def test_tool_definition_validates_handler(self) -> None:
-        tool = Tool("echo", "返回输入", lambda arguments: arguments)
-        self.assertEqual(tool.capability, ToolCapability())
+        def sync_handler(arguments: object) -> object:
+            return arguments
+
+        async def async_handler(arguments: object) -> object:
+            return arguments
+
+        sync_tool = Tool("sync_echo", "同步返回输入", sync_handler)
+        async_tool = Tool("async_echo", "异步返回输入", async_handler)
+        self.assertEqual(sync_tool.capability, ToolCapability())
+        self.assertEqual(async_tool.capability, ToolCapability())
         with self.assertRaises(TypeError):
             Tool("echo", "返回输入", "not-callable")  # type: ignore[arg-type]
 
@@ -107,6 +116,69 @@ class CoreModelTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "messages 不能为空"):
             ModelRequest("run-1", ())
 
+    def test_system_and_user_messages_require_plain_text(self) -> None:
+        for role in (MessageRole.SYSTEM, MessageRole.USER):
+            with self.subTest(role=role):
+                message = ModelMessage(role, "有效文本")
+                self.assertEqual(message.content, "有效文本")
+                with self.assertRaisesRegex(ValueError, "content 必须是非空字符串"):
+                    ModelMessage(role, "")
+
+    def test_assistant_message_supports_text_and_tool_calls(self) -> None:
+        call = ToolCall("call-1", "get_weather", {"city": "南京"})
+        text_only = ModelMessage(MessageRole.ASSISTANT, content="我来查询天气。")
+        calls_only = ModelMessage(MessageRole.ASSISTANT, tool_calls=(call,))
+        text_and_calls = ModelMessage(
+            MessageRole.ASSISTANT,
+            content="我先查询天气。",
+            tool_calls=(call,),
+        )
+        self.assertEqual(text_only.content, "我来查询天气。")
+        self.assertEqual(calls_only.tool_calls, (call,))
+        self.assertEqual(text_and_calls.tool_calls, (call,))
+
+    def test_assistant_message_rejects_empty_payload(self) -> None:
+        with self.assertRaisesRegex(ValueError, "至少包含 content 或 tool_calls"):
+            ModelMessage(MessageRole.ASSISTANT)
+        with self.assertRaisesRegex(ValueError, "不能包含 tool_call_id"):
+            ModelMessage(
+                MessageRole.ASSISTANT,
+                content="已完成",
+                tool_call_id="call-1",
+            )
+
+    def test_tool_message_requires_content_and_tool_call_id(self) -> None:
+        message = ModelMessage(
+            MessageRole.TOOL,
+            content='{"temperature": 31}',
+            tool_call_id="call-1",
+        )
+        self.assertEqual(message.tool_call_id, "call-1")
+        with self.assertRaisesRegex(ValueError, "content 必须是非空字符串"):
+            ModelMessage(MessageRole.TOOL, tool_call_id="call-1")
+        with self.assertRaisesRegex(ValueError, "tool_call_id 必须是非空字符串"):
+            ModelMessage(MessageRole.TOOL, content="执行失败")
+
+    def test_tool_message_rejects_tool_calls(self) -> None:
+        call = ToolCall("call-1", "get_weather")
+        with self.assertRaisesRegex(ValueError, "TOOL 消息不能包含 tool_calls"):
+            ModelMessage(
+                MessageRole.TOOL,
+                content="执行完成",
+                tool_calls=(call,),
+                tool_call_id="call-1",
+            )
+
+    def test_system_and_user_messages_reject_tool_fields(self) -> None:
+        call = ToolCall("call-1", "get_weather")
+        for role in (MessageRole.SYSTEM, MessageRole.USER):
+            with self.subTest(role=role, field="tool_calls"):
+                with self.assertRaisesRegex(ValueError, "不能包含 tool_calls"):
+                    ModelMessage(role, content="文本", tool_calls=(call,))
+            with self.subTest(role=role, field="tool_call_id"):
+                with self.assertRaisesRegex(ValueError, "不能包含 tool_call_id"):
+                    ModelMessage(role, content="文本", tool_call_id="call-1")
+
     def test_model_response_and_trace_basic_construction(self) -> None:
         now = datetime.now(timezone.utc)
         request = ModelRequest(
@@ -117,8 +189,14 @@ class CoreModelTests(unittest.TestCase):
             stop_reason=StopReason.COMPLETED,
             usage={"total_tokens": 3},
         )
-        record = ModelCallRecord(request, response, now, now)
+        record = ModelCallRecord("openai", "gpt-test", request, response, now, now)
+        self.assertEqual(record.provider, "openai")
+        self.assertEqual(record.model, "gpt-test")
         self.assertEqual(record.response.usage["total_tokens"], 3)
+        with self.assertRaisesRegex(ValueError, "provider 必须是非空字符串"):
+            ModelCallRecord("", "gpt-test", request, response, now, now)
+        with self.assertRaisesRegex(ValueError, "model 必须是非空字符串"):
+            ModelCallRecord("openai", "", request, response, now, now)
         with self.assertRaises(ValueError):
             ModelResponse(
                 stop_reason=StopReason.ERROR,

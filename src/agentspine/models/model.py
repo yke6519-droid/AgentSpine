@@ -24,17 +24,49 @@ class MessageRole(str, Enum):
 
 @dataclass(frozen=True, slots=True)
 class ModelMessage:
-    """单个 Run 内提供给模型的一条消息。"""
+    """单个 Run 内提供给模型的一条 Provider 无关消息。
+
+    ``ASSISTANT`` 消息可以提出 ToolCall，``TOOL`` 消息通过
+    ``tool_call_id`` 返回对应调用的序列化结果。完整 ToolResult 属于 Harness
+    内部执行事实，不直接放入本模型。
+    """
 
     # 消息发送方或消息用途。
     role: MessageRole
-    # 提供给模型的文本内容；允许空字符串以兼容部分 Provider 响应。
-    content: str
+    # 提供给模型的文本内容；部分 ASSISTANT ToolCall 消息可以没有文本。
+    content: str | None = None
+    # ASSISTANT 提出的工具调用；其他角色必须为空。
+    tool_calls: tuple[ToolCall, ...] = ()
+    # TOOL 消息所响应的 ToolCall；其他角色必须为 None。
+    tool_call_id: str | None = None
 
     def __post_init__(self) -> None:
         require_enum(self.role, MessageRole, "role")
-        if not isinstance(self.content, str):
-            raise TypeError("content 必须是字符串")
+        if self.content is not None and not isinstance(self.content, str):
+            raise TypeError("content 必须是字符串或 None")
+        if not isinstance(self.tool_calls, tuple) or not all(
+            isinstance(call, ToolCall) for call in self.tool_calls
+        ):
+            raise TypeError("tool_calls 必须是由 ToolCall 组成的元组")
+
+        if self.role in {MessageRole.SYSTEM, MessageRole.USER}:
+            require_non_empty(self.content, "content")
+            if self.tool_calls:
+                raise ValueError("SYSTEM 和 USER 消息不能包含 tool_calls")
+            if self.tool_call_id is not None:
+                raise ValueError("SYSTEM 和 USER 消息不能包含 tool_call_id")
+        elif self.role is MessageRole.ASSISTANT:
+            if self.content is None and not self.tool_calls:
+                raise ValueError("ASSISTANT 消息必须至少包含 content 或 tool_calls")
+            if self.content is not None:
+                require_non_empty(self.content, "content")
+            if self.tool_call_id is not None:
+                raise ValueError("ASSISTANT 消息不能包含 tool_call_id")
+        else:
+            require_non_empty(self.content, "content")
+            require_non_empty(self.tool_call_id, "tool_call_id")
+            if self.tool_calls:
+                raise ValueError("TOOL 消息不能包含 tool_calls")
 
 
 @dataclass(frozen=True, slots=True)

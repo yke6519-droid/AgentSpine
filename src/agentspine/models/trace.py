@@ -21,6 +21,10 @@ from .tool import ToolCall, ToolResult
 class ModelCallRecord:
     """一次完整模型调用的请求、响应和耗时边界。"""
 
+    # 实际处理本次调用的 Provider，例如 openai 或 anthropic。
+    provider: str
+    # 实际处理本次调用的模型名称。
+    model: str
     # 实际发送给 ModelGateway 的统一请求。
     request: ModelRequest
     # ModelGateway 返回的统一响应。
@@ -31,6 +35,8 @@ class ModelCallRecord:
     finished_at: datetime
 
     def __post_init__(self) -> None:
+        require_non_empty(self.provider, "provider")
+        require_non_empty(self.model, "model")
         if not isinstance(self.request, ModelRequest):
             raise TypeError("request 必须是 ModelRequest 类型")
         if not isinstance(self.response, ModelResponse):
