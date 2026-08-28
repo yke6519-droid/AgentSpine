@@ -5,3 +5,8 @@ __pycache__/
 dist/
 build/
 *.egg-info/
+
+# 本地密钥不进入 Git；只允许提交空白配置示例。
+.env
+.env.*
+!.env.example

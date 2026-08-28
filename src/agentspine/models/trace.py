@@ -14,7 +14,7 @@ from ._validation import (
 from .model import ModelRequest, ModelResponse
 from .policy import PolicyDecision
 from .runtime import RunStatus
-from .tool import ToolCall, ToolCallStatus, ToolResult
+from .tool import ToolCall, ToolCallStatus, ToolResult, ToolResultStatus
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,6 +75,16 @@ class ToolCallRecord:
                 raise ValueError("result.call_id 必须与 call.call_id 一致")
             if self.result.tool_name != self.call.tool_name:
                 raise ValueError("result.tool_name 必须与 call.tool_name 一致")
+            expected_status = (
+                ToolCallStatus.SUCCEEDED
+                if self.result.status is ToolResultStatus.SUCCESS
+                else ToolCallStatus.FAILED
+            )
+            if self.call.status is not expected_status:
+                raise ValueError(
+                    "SUCCESS ToolResult 只能对应 SUCCEEDED ToolCall，"
+                    "ERROR ToolResult 只能对应 FAILED ToolCall"
+                )
         require_aware_datetime(self.started_at, "started_at")
         require_aware_datetime(self.finished_at, "finished_at")
         require_time_order(self.started_at, self.finished_at)

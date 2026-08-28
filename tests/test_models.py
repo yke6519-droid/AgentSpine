@@ -198,11 +198,9 @@ class CoreModelTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "model 必须是非空字符串"):
             ModelCallRecord("openai", "", request, response, now, now)
         with self.assertRaises(ValueError):
-            ModelResponse(
-                stop_reason=StopReason.ERROR,
-                usage={"total_tokens": -1},
-                error="provider failed",
-            )
+            ModelResponse(usage={"total_tokens": -1})
+        self.assertNotIn("ERROR", StopReason.__members__)
+        self.assertNotIn("error", ModelResponse.__dataclass_fields__)
 
     def test_policy_decision_is_data_only(self) -> None:
         decision = PolicyDecision(PolicyOutcome.DENY, "tool is not allowed", "rule-1")
@@ -277,6 +275,28 @@ class CoreModelTests(unittest.TestCase):
             replace(result, status=RunStatus.RUNNING)
         with self.assertRaises(ValueError):
             replace(result, usage={"input_tokens": -1})
+
+    def test_failed_tool_call_is_the_only_call_with_error_result(self) -> None:
+        result = ToolResult(
+            "call-1",
+            "echo",
+            ToolResultStatus.ERROR,
+            message="handler 执行失败",
+        )
+        failed = ToolCall("call-1", "echo", status=ToolCallStatus.FAILED)
+        self.assertEqual(ToolCallRecord(failed, None, result).result, result)
+        for status in (
+            ToolCallStatus.PROPOSED,
+            ToolCallStatus.REJECTED,
+            ToolCallStatus.DENIED,
+        ):
+            with self.subTest(status=status):
+                with self.assertRaises(ValueError):
+                    ToolCallRecord(
+                        ToolCall("call-1", "echo", status=status),
+                        None,
+                        result,
+                    )
 
     def test_naive_timestamps_are_rejected(self) -> None:
         with self.assertRaises(ValueError):

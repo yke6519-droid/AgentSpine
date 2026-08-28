@@ -1,5 +1,13 @@
 """AgentSpine 的公开数据契约。"""
 
+from .model_gateway import (
+    ModelConfig,
+    ModelGateway,
+    ModelGatewayError,
+    ModelGatewayErrorCode,
+    ModelClient,
+)
+
 from .models import (
     Effect,
     MessageRole,
@@ -25,16 +33,24 @@ from .models import (
     ToolResultStatus,
     TraceError,
 )
+from .providers import DeepSeekClient, QwenClient
 
 __all__ = [
     "Effect",
+    "DeepSeekClient",
     "MessageRole",
+    "ModelConfig",
+    "ModelGateway",
+    "ModelGatewayError",
+    "ModelGatewayErrorCode",
     "ModelCallRecord",
     "ModelMessage",
     "ModelRequest",
     "ModelResponse",
     "PolicyDecision",
     "PolicyOutcome",
+    "ModelClient",
+    "QwenClient",
     "Replay",
     "Run",
     "RunResult",

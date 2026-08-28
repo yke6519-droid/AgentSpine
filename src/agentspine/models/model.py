@@ -114,8 +114,6 @@ class StopReason(str, Enum):
     TOOL_CALLS = "tool_calls"
     # 因长度或 Token 上限停止。
     LENGTH = "length"
-    # Provider 调用或响应处理失败。
-    ERROR = "error"
     # Provider 返回了当前契约尚未单独归类的原因。
     OTHER = "other"
 
@@ -132,9 +130,6 @@ class ModelResponse:
     stop_reason: StopReason = StopReason.COMPLETED
     # Token 等计量数据；键名由后续 Gateway 统一。
     usage: Mapping[str, int] = field(default_factory=dict)
-    # Provider 调用失败时的人类可读错误信息。
-    error: str | None = None
-
     def __post_init__(self) -> None:
         if self.text is not None and not isinstance(self.text, str):
             raise TypeError("text 必须是字符串或 None")
@@ -144,10 +139,6 @@ class ModelResponse:
             raise TypeError("tool_calls 必须是由 ToolCall 组成的元组")
         require_enum(self.stop_reason, StopReason, "stop_reason")
         _validate_usage(self.usage)
-        if self.stop_reason is StopReason.ERROR:
-            require_non_empty(self.error, "error")
-        elif self.error is not None:
-            raise ValueError("设置 error 时，stop_reason 必须为 ERROR")
 
 
 def _validate_usage(usage: Mapping[str, int]) -> None:
